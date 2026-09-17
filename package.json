@@ -1,0 +1,21 @@
+{
+  "name": "learn-tdd-meeting-room-booking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Meeting Room Booking System (Java Spring Boot & React TypeScript)",
+  "scripts": {
+    "verify": "npm run test:be && npm run test:fe",
+    "test": "npm run test:be",
+    "test:be": "cd be && .\\mvnw.cmd test",
+    "test:fe": "cd fe && npm test",
+    "dev:be": "cd be && .\\mvnw.cmd spring-boot:run",
+    "dev:fe": "cd fe && npm run dev",
+    "dev": "concurrently -n \"BE,FE\" -c \"green,cyan\" \"npm run dev:be\" \"npm run dev:fe\"",
+    "build:be": "cd be && .\\mvnw.cmd package -DskipTests",
+    "build:fe": "cd fe && npm run build",
+    "build": "npm run build:be && npm run build:fe"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

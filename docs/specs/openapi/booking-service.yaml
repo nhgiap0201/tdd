@@ -1,0 +1,263 @@
+openapi: 3.0.3
+info:
+  title: RoomSync Meeting Room Booking API
+  description: API hợp đồng đặc tả hệ thống Đặt phòng họp nội bộ RoomSync phục vụ 200 nhân sự và 5 phòng họp.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local Spring Boot Development Server
+
+paths:
+  /api/health:
+    get:
+      summary: Kiểm tra tình trạng hoạt động của hệ thống
+      operationId: checkHealth
+      responses:
+        '200':
+          description: Hệ thống đang vận hành bình thường
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  service:
+                    type: string
+                    example: Meeting Room Booking Spring Boot API
+
+  /api/v1/rooms:
+    get:
+      summary: Lấy danh sách toàn bộ phòng họp khả dụng
+      operationId: getRooms
+      responses:
+        '200':
+          description: Danh sách phòng họp
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoomResponse'
+
+  /api/v1/bookings:
+    get:
+      summary: Lấy danh sách lịch đặt phòng
+      operationId: getBookings
+      responses:
+        '200':
+          description: Danh sách các lượt đặt phòng đã tạo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponse'
+
+    post:
+      summary: Tạo mới lượt đặt phòng họp (Tuân thủ TDD & 3 System Invariants)
+      operationId: createBooking
+      parameters:
+        - in: header
+          name: X-Idempotency-Key
+          required: false
+          schema:
+            type: string
+          description: Khóa chống trùng lặp yêu cầu mạng (Idempotency)
+        - in: header
+          name: X-User-Id
+          required: false
+          schema:
+            type: string
+            default: USER_EMP_01
+          description: Định danh nhân viên thực hiện đặt phòng
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Đặt phòng thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          description: Dữ liệu thời gian hoặc tham số không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              examples:
+                pastTime:
+                  summary: Thời gian trong quá khứ
+                  value:
+                    status: 400
+                    error: PAST_TIME_INVALID
+                    errorCode: PAST_TIME_INVALID
+                    message: Không thể đặt phòng với thời gian trong quá khứ
+                durationInvalid:
+                  summary: Thời lượng không hợp lệ (dưới 15 phút hoặc quá 120 phút)
+                  value:
+                    status: 400
+                    error: DURATION_INVALID
+                    errorCode: DURATION_INVALID
+                    message: Thời lượng cuộc họp phải từ 15 phút đến 120 phút
+                outsideBusinessHours:
+                  summary: Đặt ngoài khung giờ hành chính 08:00 - 18:00 (Invariant 3)
+                  value:
+                    status: 400
+                    error: OUTSIDE_BUSINESS_HOURS
+                    errorCode: OUTSIDE_BUSINESS_HOURS
+                    message: Chỉ được đặt phòng trong khung giờ hành chính từ 08:00 đến 18:00
+                weekendNotAllowed:
+                  summary: Đặt vào ngày cuối tuần Thứ 7 hoặc Chủ Nhật (Invariant 3)
+                  value:
+                    status: 400
+                    error: WEEKEND_NOT_ALLOWED
+                    errorCode: WEEKEND_NOT_ALLOWED
+                    message: Không được phép đặt phòng vào Thứ Bảy hoặc Chủ Nhật
+        '404':
+          description: Không tìm thấy phòng họp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              example:
+                status: 404
+                error: ROOM_NOT_FOUND
+                errorCode: ROOM_NOT_FOUND
+                message: Không tìm thấy phòng họp được chỉ định
+        '409':
+          description: Xung đột tài nguyên (Trùng lịch hoặc vượt sức chứa)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+              examples:
+                overlap:
+                  summary: Trùng lịch với cuộc họp đã có
+                  value:
+                    status: 409
+                    error: OVERLAPPING_BOOKING
+                    errorCode: OVERLAPPING_BOOKING
+                    message: Phòng họp đã có người đặt trong khung giờ này
+                exceedsCapacity:
+                  summary: Số người vượt sức chứa
+                  value:
+                    status: 409
+                    error: EXCEEDS_CAPACITY
+                    errorCode: EXCEEDS_CAPACITY
+                    message: Số lượng người tham gia vượt quá sức chứa tối đa của phòng
+
+components:
+  schemas:
+    RoomResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ROOM-01
+        name:
+          type: string
+          example: Hội Trường Sáng Tạo (Room A)
+        capacity:
+          type: integer
+          example: 20
+        status:
+          type: string
+          example: AVAILABLE
+
+    CreateBookingRequest:
+      type: object
+      required:
+        - roomId
+        - startTime
+        - endTime
+      properties:
+        roomId:
+          type: string
+          example: ROOM-01
+        title:
+          type: string
+          example: Họp giao ban quý 3
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-10-01T10:00:00.000Z"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-10-01T11:00:00.000Z"
+        attendees:
+          type: integer
+          example: 8
+
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: BOOK-98234-XYZ
+        roomId:
+          type: string
+          example: ROOM-01
+        bookedByUserId:
+          type: string
+          example: USER_EMP_01
+        title:
+          type: string
+          example: Họp giao ban quý 3
+        startTime:
+          type: string
+          example: "2026-10-01T10:00:00.000Z"
+        endTime:
+          type: string
+          example: "2026-10-01T11:00:00.000Z"
+        attendees:
+          type: integer
+          example: 8
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED, PENDING]
+          example: CONFIRMED
+        createdAt:
+          type: string
+          example: "2026-09-17T14:30:00.000Z"
+        updatedAt:
+          type: string
+          example: "2026-09-17T14:30:00.000Z"
+
+    ApiErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          example: "2026-09-17T14:30:00.000Z"
+        status:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: OVERLAPPING_BOOKING
+        errorCode:
+          type: string
+          enum:
+            - ROOM_NOT_FOUND
+            - OVERLAPPING_BOOKING
+            - PAST_TIME_INVALID
+            - EXCEEDS_CAPACITY
+            - CAPACITY_EXCEEDED
+            - DURATION_INVALID
+            - OUTSIDE_BUSINESS_HOURS
+            - WEEKEND_NOT_ALLOWED
+          example: OVERLAPPING_BOOKING
+        message:
+          type: string
+          example: Phòng họp đã có người đặt trong khung giờ này
+        path:
+          type: string
+          example: /api/v1/bookings

@@ -1,0 +1,41 @@
+name: Security & Vulnerability Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1' # Hàng tuần vào 0h Thứ Hai
+
+jobs:
+  security-audit:
+    name: Dependency & Secrets Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Audit Root Dependencies
+        run: npm audit --audit-level=high || true
+
+      - name: Audit Frontend Dependencies
+        run: |
+          cd fe
+          npm audit --audit-level=high || true
+
+      - name: Secret Detection (GitGuardian / TruffleHog Scan)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+        continue-on-error: true

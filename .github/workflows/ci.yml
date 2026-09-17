@@ -1,0 +1,80 @@
+name: Continuous Integration (CI Quality Gate)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-validation:
+    name: Backend (Java 21 Spring Boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Make Maven Wrapper Executable
+        run: chmod +x be/mvnw
+
+      - name: Run Backend JUnit 5 Test Suite (TDD Verification)
+        run: |
+          cd be
+          ./mvnw clean test
+
+      - name: Package Backend Application (JAR verification)
+        run: |
+          cd be
+          ./mvnw package -DskipTests
+
+  frontend-validation:
+    name: Frontend (React TypeScript Vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: fe/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd fe
+          npm ci
+
+      - name: Run Frontend Vitest Suite
+        run: |
+          cd fe
+          npm test
+
+      - name: Build Frontend Production Bundle
+        run: |
+          cd fe
+          npm run build
+
+  quality-gate:
+    name: Final Quality Gate
+    needs: [backend-validation, frontend-validation]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quality Gate Status
+        run: echo "✅ Tất cả các bài kiểm tra Backend & Frontend đều PASS 100%! Sẵn sàng để Human Reviewer phê duyệt."

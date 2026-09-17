@@ -1,0 +1,17 @@
+# Phân quyền duyệt mã bắt buộc cho RoomSync
+
+# Mọi thay đổi trong repo cần ít nhất 1 kỹ sư duyệt
+*       @lead-dev
+
+# Khóa tài liệu hợp đồng và quy chuẩn AI Agent (chỉ Tech Lead được sửa)
+/.agents/                @tech-lead
+/docs/adr/               @tech-lead
+/docs/specs/             @tech-lead
+/specs/                  @tech-lead
+
+# Core Backend Domain & System Invariants
+/be/src/main/java/com/roomsync/booking/domain/     @tech-lead @backend-senior
+/be/src/main/java/com/roomsync/booking/service/    @tech-lead @backend-senior
+
+# Pipeline CI/CD & GitHub Workflows
+/.github/                @devops-lead @tech-lead
